@@ -930,7 +930,7 @@ class InCollegeServer(InCollegeBackend):
             
             print("Current preferences (Emails: " + emailPreference + ", SMS: " + smsPreference + ", Advertising: " + adsPreference + ")")
             self.checkPendingRequests()
-            self.checkPendingMessages()
+            self.notificationsMainMenu()
 
             try: 
                 choice = prompt({
@@ -956,6 +956,7 @@ class InCollegeServer(InCollegeBackend):
                 
                     case "Job search/internship":
                         while True:
+                            self.notificationsJob()
                             try:
                                 choice = prompt({
                                         "type": "list", 

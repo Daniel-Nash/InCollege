@@ -664,20 +664,6 @@ class InCollegeBackend():
         else:
             print("Message not found in your inbox.")
 
-    def checkPendingMessages(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                fetch_query = """
-                SELECT sender 
-                FROM messages 
-                WHERE receiver = %s AND status = 'unread';
-                """
-                cursor.execute(fetch_query, (self.userID,))
-                messages = cursor.fetchall()
-
-        if messages:
-            print(f"\nYou have {len(messages)} pending messages in your inbox!")
-
     def getJobCount(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
@@ -847,3 +833,52 @@ class InCollegeBackend():
                 cursor.execute(fetch_query, (self.userID,))
                 messages = cursor.fetchall()
         return messages
+    
+    ###################
+    ## NOTIFICATIONS ##
+    ###################
+
+    def notificationsMainMenu(self):
+        InCollegeBackend.notiNotAppliedIn7Days(self)
+        InCollegeBackend.notiNotCreatedProfile(self)
+        InCollegeBackend.notiCheckMessages(self)
+        InCollegeBackend.notiNewStudents(self)
+        
+
+    def notificationsJob(self):
+        InCollegeBackend.notiNumberOfJobsApplied(self)
+        InCollegeBackend.notiNewJobPosted(self)
+        InCollegeBackend.notiJobDeleted(self)
+
+    def notiNotAppliedIn7Days(self):
+        pass
+
+    def notiNotCreatedProfile(self):
+        pass
+
+    def notiCheckMessages(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                fetch_query = """
+                SELECT sender 
+                FROM messages 
+                WHERE receiver = %s AND status = 'unread';
+                """
+                cursor.execute(fetch_query, (self.userID,))
+                messages = cursor.fetchall()
+
+        if messages:
+            print(f"\nYou have messages waiting for you")
+
+    def notiNumberOfJobsApplied(self):
+        print ("You have applied to 0 jobs")
+
+    def notiNewJobPosted(self):
+        pass
+
+    def notiJobDeleted(self):
+        pass
+
+    def notiNewStudents(self):
+        pass
+        
