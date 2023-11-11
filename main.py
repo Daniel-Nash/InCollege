@@ -175,6 +175,7 @@ class InCollegeServer(InCollegeBackend):
                 self.language = user['language']
                 self.tier = user['tier']
                 self.loggedIn = True
+                self.update_last_login(existingUserID)
 
                 print(f"\nWelcome, {self.userID}. You have successfully logged in.")
                 return
@@ -247,6 +248,7 @@ class InCollegeServer(InCollegeBackend):
         self.has_ad = True
         self.language = "English"
         self.tier = tier
+        self.update_last_login(userID)
         
         print(f"\nWelcome, {self.userID}. You have successfully logged in.\n")
         
