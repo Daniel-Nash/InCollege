@@ -905,12 +905,10 @@ class InCollegeBackend():
 
                         # If the difference is greater than 7 days, generate the notification
                         if difference.days > 7:
-                            print("\nRemember – you're going to want to have a job when you graduate. "
-                                  "Make sure that you start to apply for jobs today!")
+                            print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
                     else:
                         # If the student hasn't applied for any jobs, generate the notification
-                        print("\nRemember – you're going to want to have a job when you graduate. "
-                              "Make sure that you start to apply for jobs today!")
+                        print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
