@@ -1,6 +1,7 @@
 import psycopg
 import re
 from psycopg.rows import dict_row
+from datetime import datetime, timedelta
 
 DATABASE_QUERY_STRING = """
                         CREATE TABLE users (
@@ -881,10 +882,63 @@ class InCollegeBackend():
         InCollegeBackend.notiJobDeleted(self)
 
     def notiNotAppliedIn7Days(self):
-        pass
+        try:
+            with psycopg.connect(
+                    dbname=self.DATABASE_NAME,
+                    user=self.DATABASE_USER,
+                    password=self.DATABASE_PASSWORD,
+                    host=self.DATABASE_HOST,
+                    port=self.DATABASE_PORT
+            ) as connection:
+                with connection.cursor() as cursor:
+                    fetch_last_application_date_query = """
+                    SELECT MAX(applied_at) 
+                    FROM job_applications 
+                    WHERE user_id = %s;
+                    """
+                    cursor.execute(fetch_last_application_date_query, (self.userID,))
+                    last_application_date = cursor.fetchone()[0]
+
+                    if last_application_date:
+                        # Calculate the difference between the current date and the last application date
+                        difference = datetime.now() - last_application_date
+
+                        # If the difference is greater than 7 days, generate the notification
+                        if difference.days > 7:
+                            print("\nRemember – you're going to want to have a job when you graduate. "
+                                  "Make sure that you start to apply for jobs today!")
+                    else:
+                        # If the student hasn't applied for any jobs, generate the notification
+                        print("\nRemember – you're going to want to have a job when you graduate. "
+                              "Make sure that you start to apply for jobs today!")
+
+        except psycopg.Error as e:
+            print(f"Error: {e}")
 
     def notiNotCreatedProfile(self):
-        pass
+        try:
+            with psycopg.connect(
+                    dbname=self.DATABASE_NAME,
+                    user=self.DATABASE_USER,
+                    password=self.DATABASE_PASSWORD,
+                    host=self.DATABASE_HOST,
+                    port=self.DATABASE_PORT
+            ) as connection:
+                with connection.cursor() as cursor:
+                    check_query = """
+                    SELECT user_id
+                    FROM users
+                    WHERE user_id = %s
+                      AND user_id NOT IN (SELECT user_id FROM profiles);
+                    """
+                    cursor.execute(check_query, (self.userID,))
+                    result = cursor.fetchone()
+
+                    if result:
+                        print("\nDon't forget to create a profile.")
+
+        except psycopg.Error as e:
+            print(f"Error: {e}")
 
     def notiCheckMessages(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
@@ -921,7 +975,30 @@ class InCollegeBackend():
         pass
 
     def notiNewStudents(self):
-        pass
+        try:
+            with psycopg.connect(
+                    dbname=self.DATABASE_NAME,
+                    user=self.DATABASE_USER,
+                    password=self.DATABASE_PASSWORD,
+                    host=self.DATABASE_HOST,
+                    port=self.DATABASE_PORT
+            ) as connection:
+                with connection.cursor() as cursor:
+                    fetch_query = """
+                    SELECT user_id, first_name, last_name
+                    FROM users
+                    WHERE created_at > (SELECT last_login FROM users WHERE user_id = %s)
+                      AND user_id != %s;
+                    """
+                    cursor.execute(fetch_query, (self.userID, self.userID))
+                    new_students = cursor.fetchall()
+
+                    for student in new_students:
+                        user_id, first_name, last_name = student
+                        print(f"\n{first_name} {last_name} has joined InCollege")
+
+        except psycopg.Error as e:
+            print(f"Error: {e}")
 
     ######################
     ## TIMESTAMP UPDATE ##

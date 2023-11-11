@@ -175,7 +175,7 @@ class InCollegeServer(InCollegeBackend):
                 self.language = user['language']
                 self.tier = user['tier']
                 self.loggedIn = True
-                self.update_last_login(existingUserID)
+                
 
                 print(f"\nWelcome, {self.userID}. You have successfully logged in.")
                 return
@@ -933,6 +933,7 @@ class InCollegeServer(InCollegeBackend):
             print("Current preferences (Emails: " + emailPreference + ", SMS: " + smsPreference + ", Advertising: " + adsPreference + ")")
             self.checkPendingRequests()
             self.notificationsMainMenu()
+            self.update_last_login(self.userID)
 
             try: 
                 choice = prompt({
