@@ -874,12 +874,12 @@ class InCollegeBackend():
         InCollegeBackend.notiNotAppliedIn7Days(self)
         InCollegeBackend.notiNotCreatedProfile(self)
         InCollegeBackend.notiCheckMessages(self)
+        InCollegeBackend.notiNewJobPosted(self)
+        #InCollegeBackend.notiJobDeleted(self)
         InCollegeBackend.notiNewStudents(self)
 
     def notificationsJob(self):
         InCollegeBackend.notiNumberOfJobsApplied(self)
-        InCollegeBackend.notiNewJobPosted(self)
-        InCollegeBackend.notiJobDeleted(self)
 
     def notiNotAppliedIn7Days(self):
         try:
@@ -888,8 +888,7 @@ class InCollegeBackend():
                     user=self.DATABASE_USER,
                     password=self.DATABASE_PASSWORD,
                     host=self.DATABASE_HOST,
-                    port=self.DATABASE_PORT
-            ) as connection:
+                    port=self.DATABASE_PORT) as connection:
                 with connection.cursor() as cursor:
                     fetch_last_application_date_query = """
                     SELECT MAX(applied_at) 
@@ -905,10 +904,10 @@ class InCollegeBackend():
 
                         # If the difference is greater than 7 days, generate the notification
                         if difference.days > 7:
-                            print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
+                            print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!\n")
                     else:
                         # If the student hasn't applied for any jobs, generate the notification
-                        print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
+                        print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!\n")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
@@ -920,8 +919,7 @@ class InCollegeBackend():
                     user=self.DATABASE_USER,
                     password=self.DATABASE_PASSWORD,
                     host=self.DATABASE_HOST,
-                    port=self.DATABASE_PORT
-            ) as connection:
+                    port=self.DATABASE_PORT) as connection:
                 with connection.cursor() as cursor:
                     check_query = """
                     SELECT user_id
@@ -933,7 +931,7 @@ class InCollegeBackend():
                     result = cursor.fetchone()
 
                     if result:
-                        print("\nDon't forget to create a profile.")
+                        print("Don't forget to create a profile.\n")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
@@ -950,7 +948,7 @@ class InCollegeBackend():
                 messages = cursor.fetchall()
 
         if messages:
-            print(f"\nYou have messages waiting for you")
+            print(f"You have messages waiting for you\n")
 
     def notiNumberOfJobsApplied(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
@@ -963,13 +961,28 @@ class InCollegeBackend():
                 cursor.execute(fetch_query, (self.userID,))
                 number_of_jobs_applied = cursor.fetchone()[0]
 
-        print(
-            f"You have currently applied for {number_of_jobs_applied} job(s)")
+        print(f"You have currently applied for {number_of_jobs_applied} job(s)\n")
 
     def notiNewJobPosted(self):
-        pass
+        try:
+            with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+                with connection.cursor() as cursor:
+                    fetch_query = """
+                    SELECT user_id, title
+                    FROM jobs
+                    WHERE date_posted > (SELECT last_login FROM users WHERE user_id = %s) AND user_id != %s;
+                    """
+                    cursor.execute(fetch_query, (self.userID, self.userID))
+                    new_jobs = cursor.fetchall()
 
-    def notiJobDeleted(self):
+                    for job in new_jobs:
+                        user_id, title = job
+                        print(f"A new job {title} has been posted by {user_id}.\n")
+
+        except psycopg.Error as e:
+            print(f"Error: {e}")
+    
+    def notiJobDeleted(self, id):
         pass
 
     def notiNewStudents(self):
@@ -979,8 +992,7 @@ class InCollegeBackend():
                     user=self.DATABASE_USER,
                     password=self.DATABASE_PASSWORD,
                     host=self.DATABASE_HOST,
-                    port=self.DATABASE_PORT
-            ) as connection:
+                    port=self.DATABASE_PORT) as connection:
                 with connection.cursor() as cursor:
                     fetch_query = """
                     SELECT user_id, first_name, last_name
@@ -993,7 +1005,7 @@ class InCollegeBackend():
 
                     for student in new_students:
                         user_id, first_name, last_name = student
-                        print(f"\n{first_name} {last_name} has joined InCollege")
+                        print(f"{first_name} {last_name} has joined InCollege\n")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
@@ -1009,8 +1021,7 @@ class InCollegeBackend():
                     user=self.DATABASE_USER,
                     password=self.DATABASE_PASSWORD,
                     host=self.DATABASE_HOST,
-                    port=self.DATABASE_PORT
-            ) as connection:
+                    port=self.DATABASE_PORT) as connection:
                 with connection.cursor() as cursor:
                     update_query = """
                     UPDATE users
