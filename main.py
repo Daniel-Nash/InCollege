@@ -100,6 +100,7 @@ class InCollegeServer(InCollegeBackend):
             
             else:
                 id = options.index(choice[0])
+                self.changeApplicationToZero(ids[id])
                 self.deleteJobFromDatabase(ids[id])
 
         else:
@@ -740,6 +741,11 @@ class InCollegeServer(InCollegeBackend):
                 if job_user_id and job_user_id[0] == self.userID:
                     print("You cannot apply for a job you have posted.")
                     return
+        # Fetch title of the job
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT title FROM jobs WHERE job_id = %s", (job_id,))
+                job_title = cursor.fetchone()
         print("Graduation Date Information:")
         graduation_date = helper.getDate()
         print("Start Date Information:")
@@ -747,7 +753,7 @@ class InCollegeServer(InCollegeBackend):
         paragraph_text = input("Explain why you think you would be a good fit for this job: ")
 
         # Store the application in the database
-        self.storeJobApplication(job_id, graduation_date, start_date, paragraph_text)
+        self.storeJobApplication(job_id, job_title[0], graduation_date, start_date, paragraph_text)
 
         print("Application submitted successfully!")
 

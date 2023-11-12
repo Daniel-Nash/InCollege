@@ -70,12 +70,12 @@ DATABASE_QUERY_STRING = """
                         CREATE TABLE job_applications (
                             application_id SERIAL PRIMARY KEY,
                             user_id VARCHAR(255) REFERENCES users(user_id),
-                            job_id INT REFERENCES jobs(job_id) ON DELETE CASCADE,
+                            job_id INT,
+                            title VARCHAR(255),
                             graduation_date DATE,
                             start_date DATE,
                             paragraph_text TEXT,
-                            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE (user_id, job_id)
+                            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
 
                         CREATE TABLE messages (
@@ -264,16 +264,15 @@ class InCollegeBackend():
                     "SELECT * FROM job_applications WHERE user_id = %s AND job_id = %s", (self.userID, job_id))
                 return cursor.fetchone() is not None
 
-    def storeJobApplication(self, job_id, graduation_date, start_date, paragraph_text):
+    def storeJobApplication(self, job_id, job_title, graduation_date, start_date, paragraph_text):
         """
         Store the job application in the database.
         """
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "INSERT INTO job_applications (user_id, job_id, graduation_date, start_date, paragraph_text) VALUES (%s, %s, %s, %s, %s)",
-                    (self.userID, job_id, graduation_date,
-                     start_date, paragraph_text)
+                    "INSERT INTO job_applications (user_id, job_id, title, graduation_date, start_date, paragraph_text) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (self.userID, job_id, job_title, graduation_date, start_date, paragraph_text)
                 )
 
     def listAppliedJobs(self):
@@ -730,6 +729,17 @@ class InCollegeBackend():
                         WHERE job_id = %s;
                         """
                 cursor.execute(delete_query, (id,))
+    
+    def changeApplicationToZero(self, oldJob_id):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                update_query = """
+                        UPDATE job_applications 
+                        SET job_id = %s
+                        WHERE job_id = %s;
+                        """
+                newJob_id = 0
+                cursor.execute(update_query, (newJob_id, oldJob_id))
 
     def getUserCount(self):
         try:
@@ -875,7 +885,7 @@ class InCollegeBackend():
         InCollegeBackend.notiNotCreatedProfile(self)
         InCollegeBackend.notiCheckMessages(self)
         InCollegeBackend.notiNewJobPosted(self)
-        #InCollegeBackend.notiJobDeleted(self)
+        InCollegeBackend.notiJobDeleted(self)
         InCollegeBackend.notiNewStudents(self)
 
     def notificationsJob(self):
@@ -904,10 +914,10 @@ class InCollegeBackend():
 
                         # If the difference is greater than 7 days, generate the notification
                         if difference.days > 7:
-                            print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!\n")
+                            print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
                     else:
                         # If the student hasn't applied for any jobs, generate the notification
-                        print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!\n")
+                        print("\nRemember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
@@ -931,7 +941,7 @@ class InCollegeBackend():
                     result = cursor.fetchone()
 
                     if result:
-                        print("Don't forget to create a profile.\n")
+                        print("\nDon't forget to create a profile.")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
@@ -948,7 +958,7 @@ class InCollegeBackend():
                 messages = cursor.fetchall()
 
         if messages:
-            print(f"You have messages waiting for you\n")
+            print(f"\nYou have messages waiting for you")
 
     def notiNumberOfJobsApplied(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
@@ -961,7 +971,7 @@ class InCollegeBackend():
                 cursor.execute(fetch_query, (self.userID,))
                 number_of_jobs_applied = cursor.fetchone()[0]
 
-        print(f"You have currently applied for {number_of_jobs_applied} job(s)\n")
+        print(f"\nYou have currently applied for {number_of_jobs_applied} job(s)")
 
     def notiNewJobPosted(self):
         try:
@@ -977,13 +987,29 @@ class InCollegeBackend():
 
                     for job in new_jobs:
                         user_id, title = job
-                        print(f"A new job {title} has been posted by {user_id}.\n")
+                        print(f"\nA new job {title} has been posted by {user_id}.")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
     
-    def notiJobDeleted(self, id):
-        pass
+    def notiJobDeleted(self):
+        try:
+            with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+                with connection.cursor() as cursor:
+                    fetch_query = """
+                    SELECT title
+                    FROM job_applications
+                    WHERE user_id = %s AND job_id = 0;
+                    """
+                    cursor.execute(fetch_query, (self.userID,))
+                    jobs_deleted = cursor.fetchall()
+
+                    for job in jobs_deleted:
+                        title = job
+                        print(f"\nA job that you applied for has been deleted: {title[0]}")
+
+        except psycopg.Error as e:
+            print(f"Error: {e}")
 
     def notiNewStudents(self):
         try:
@@ -1005,7 +1031,7 @@ class InCollegeBackend():
 
                     for student in new_students:
                         user_id, first_name, last_name = student
-                        print(f"{first_name} {last_name} has joined InCollege\n")
+                        print(f"\n{first_name} {last_name} has joined InCollege")
 
         except psycopg.Error as e:
             print(f"Error: {e}")
