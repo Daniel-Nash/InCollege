@@ -100,7 +100,6 @@ class InCollegeServer(InCollegeBackend):
             
             else:
                 id = options.index(choice[0])
-                self.changeApplicationToZero(ids[id])
                 self.deleteJobFromDatabase(ids[id])
 
         else:
@@ -1140,7 +1139,8 @@ class InCollegeServer(InCollegeBackend):
                             self.viewProfile(ids[options.index(choice[0])])
                         
                         case "Send Message":
-                            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])])
+                            message = input("Enter the message you want to send: ")
+                            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])], message = message)
 
                         case "Go Back":
                             return
@@ -1232,7 +1232,8 @@ class InCollegeServer(InCollegeBackend):
             if choice[0] == "Go Back":
                 return
 
-            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])])
+            message = input("Enter the message you want to send: ")
+            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])], message = message)
 
         else:
             print("\nYou have no connections in the system.")
@@ -1266,7 +1267,8 @@ class InCollegeServer(InCollegeBackend):
             if choice[0] == "Go Back":
                 return
 
-            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])])
+            message = input("Enter the message you want to send: ")
+            self.addMessageToDatabase(from_user_id = self.userID, to_user_id = ids[options.index(choice[0])], message = message)
 
         else:
             print("\nYou have no connections in the system.")
@@ -1333,15 +1335,7 @@ class InCollegeServer(InCollegeBackend):
 
     def respondToMessage(self, receiver_id):
         message = input("Enter your response: ")
-        
-        # Insert the response message into the table
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                insert_query = """
-                INSERT INTO messages (sender, receiver, message_txt, status) 
-                VALUES (%s, %s, %s, 'unread');
-                """
-                cursor.execute(insert_query, (self.userID, receiver_id, message))
+        self.addMessageToDatabase(self.userID, receiver_id, message)
         print("Response message sent.")
 
     def __init__(self, databaseName = DATABASE_NAME_, databaseUser = DATABASE_USER_, databasePassword = DATABASE_PASSWORD_, databaseHost = DATABASE_HOST_, databasePort = DATABASE_PORT_):
