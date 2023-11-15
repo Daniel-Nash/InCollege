@@ -1,11 +1,6 @@
 import main, pytest, psycopg, helper, datetime
 from main import DATABASE_NAME_, InCollegeServer
 
-# TODO: update comments to reflect change from .txt file to database
-
-# these functions are for managing the Users.txt file; we don't want the file to be altered in any way after the tests are completed and we don't want the test output to rely on the existing file being in a certain state.
-# so we start by saving the Users.txt contents to a string and erasing it. At the start of every test, we erase it again (to clear any alterations from previous tests) and the final test (see test_dummy) writes the string back to the Users.txt file
-
 sourceFilename = 'main'
 promptModule = sourceFilename + '.prompt'
 
@@ -40,8 +35,6 @@ defaultLastLogin = defaultFakeTime
 defaultUserTuple = (defaultUser, defaultPassword, defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)
 defaultUserTable = [[defaultUserTuple]]
 maxUsers = 10
-
-# TODO: change queries that rely on the string method to use cursor.copy()
 
 defaultTitle = "pyTester"
 defaultDescription = "testsPython"

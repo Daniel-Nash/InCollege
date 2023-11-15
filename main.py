@@ -1,7 +1,6 @@
-import re, helper, psycopg
+import helper, psycopg
 from InquirerPy import prompt
 from helper import InCollegeBackend
-from psycopg.rows import dict_row
 
 # Connect to your PostgreSQL server
 DATABASE_NAME_ = "incollegedb"
@@ -663,38 +662,7 @@ class InCollegeServer(InCollegeBackend):
                 self.changeEntry("experiences", column, entry, "experience_id", id)
 
     def jobExperience(self):
-        options = []
-        jobs = []
-        ids = []
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                flag = 0
-                try:
-                    cursor.execute(f"""SELECT *
-                                    FROM experiences
-                                    WHERE user_id = '{self.userID}'""")
-                    vals = cursor.fetchall()
-                    if not vals:
-                        raise Exception
-                except:
-                    options.append("Add Job Experience")
-                    flag = 1
-                if not flag:
-                    vals = list(vals)
-
-                    print("Current job experience:")
-                    for val in vals:
-                        print(f"""
-                            Worked as a {val[2]} for {val[3]} , from {val[4]} to {val[5]}, at {val[6]}.\n
-                            {val[7]}
-                            """)
-                        jobs.append(f"{val[2]} for {val[3]}")
-                        ids.append(val[0])
-                    options.append("Edit Job Experience")
-                    if len(vals) < 3:
-                        options.append("Add Job Experience")
-
-        options.append("Go Back")
+        options, jobs, ids = self.jobExperienceHelper()
 
         try: 
             choice = prompt({
@@ -733,18 +701,11 @@ class InCollegeServer(InCollegeBackend):
             print("You have already applied for this job. You cannot apply again.")
             return
         # Check if the user has posted this job
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT user_id FROM jobs WHERE job_id = %s", (job_id,))
-                job_user_id = cursor.fetchone()
-                if job_user_id and job_user_id[0] == self.userID:
-                    print("You cannot apply for a job you have posted.")
-                    return
+        if self.jobPostedBySelf(job_id):
+            print("You cannot apply for a job you have posted.")
+            return
         # Fetch title of the job
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT title FROM jobs WHERE job_id = %s", (job_id,))
-                job_title = cursor.fetchone()
+        job_title = self.getJobTitle(job_id)
         print("Graduation Date Information:")
         graduation_date = helper.getDate()
         print("Start Date Information:")
@@ -752,7 +713,7 @@ class InCollegeServer(InCollegeBackend):
         paragraph_text = input("Explain why you think you would be a good fit for this job: ")
 
         # Store the application in the database
-        self.storeJobApplication(job_id, job_title[0], graduation_date, start_date, paragraph_text)
+        self.storeJobApplication(job_id, job_title, graduation_date, start_date, paragraph_text)
 
         print("Application submitted successfully!")
 
@@ -787,29 +748,7 @@ class InCollegeServer(InCollegeBackend):
 
     def education(self):
 
-        options = []
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                flag = 0
-                try:
-                    cursor.execute(f"""SELECT *
-                                    FROM educations
-                                    WHERE user_id = '{self.userID}'""")
-                    vals = cursor.fetchall()
-                    if not vals:
-                        raise Exception
-                except:
-                    options.append("Add Education")
-                    flag = 1
-                if not flag:
-                    vals = list(vals[0])
-                    print(f"""
-                          Current education:
-                          Attended {vals[2]} from {vals[4]} to {vals[5]} to obtain a {vals[3]}.
-                          """)
-                    options.append("Edit Education")
-
-        options.append("Go Back")
+        options = self.educationHelper()
 
         try: 
             choice = prompt({
@@ -866,23 +805,12 @@ class InCollegeServer(InCollegeBackend):
 
     def profile(self):
         options = []
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                flag = 0
-                try:
-                    cursor.execute(f"""SELECT (title, about)
-                                    FROM profiles
-                                    WHERE user_id = '{self.userID}'""")
-                    vals = cursor.fetchall()
-                    if not vals:
-                        raise Exception
-                except:
-                    options.append("Create Profile")
-                    flag = 1
-                if not flag:
-                    options.append("Edit Profile")
-                    self.viewProfile(self.userID)
-
+        if self.hasProfile(self.userID):
+            options.append("Edit Profile")
+            self.viewProfile(self.userID)
+        else:
+            options.append("Create Profile")
+                    
         options.append("Go Back")
         
         try: 
@@ -1193,27 +1121,9 @@ class InCollegeServer(InCollegeBackend):
                         print("Choice not found, please try again.\n")
     
     def sendMessageToFriend(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Get friends where the current user is student1
-                fetch_query_1 = """
-                SELECT student2_id, first_name, last_name 
-                FROM friendships JOIN users ON friendships.student2_id = users.user_id
-                WHERE student1_id = %s AND status = 'confirmed';
-                """
-                cursor.execute(fetch_query_1, (self.userID,))
-                friends_1 = cursor.fetchall()
 
-                # Get friends where the current user is student2
-                fetch_query_2 = """
-                SELECT student1_id, first_name, last_name 
-                FROM friendships JOIN users ON friendships.student1_id = users.user_id
-                WHERE student2_id = %s AND status = 'confirmed';
-                """
-                cursor.execute(fetch_query_2, (self.userID,))
-                friends_2 = cursor.fetchall()
+        friends = self.getFriends()
 
-        friends = friends_1 + friends_2
         options = []
         ids = []
         if friends:
@@ -1239,15 +1149,8 @@ class InCollegeServer(InCollegeBackend):
             print("\nYou have no connections in the system.")
 
     def sendMessageToUser(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Construct the query
-                fetch_query = f"""
-                SELECT user_id, first_name, last_name 
-                FROM users; 
-                """
-                cursor.execute(fetch_query)
-                users = cursor.fetchall()
+        
+        users = self.getAllUsers()
             
         options = []
         ids = []       

@@ -94,7 +94,6 @@ DATABASE_QUERY_STRING = """
                         );
                         """
 
-
 def createDatabase(databaseUser, databasePassword, databaseName, databaseHost, databasePort, databaseQueryString=DATABASE_QUERY_STRING):
     with psycopg.connect(user=databaseUser, password=databasePassword) as connection:
         connection._set_autocommit(True)
@@ -103,7 +102,6 @@ def createDatabase(databaseUser, databasePassword, databaseName, databaseHost, d
     with psycopg.connect(dbname=databaseName, user=databaseUser, password=databasePassword, host=databaseHost, port=databasePort) as connection:
         with connection.cursor() as cursor:
             cursor.execute(databaseQueryString)
-
 
 def getDate():
     while True:
@@ -141,7 +139,6 @@ def getDate():
         print('Invalid input. Please input a valid day.')
 
     return f"{year}-{month}-{day}"
-
 
 class InCollegeBackend():
 
@@ -211,17 +208,9 @@ class InCollegeBackend():
 
                 return True
 
-    ##########
-    ## JOBS ##
-    ##########
-
-    #############
-    ## FRIENDS ##
-    #############
-
-    ##############
-    ## MESSAGES ##
-    ##############
+    ###########
+    ## USERS ##
+    ###########
 
     # change crit/crit2 method to accept a list of lists with critical rows and critical entries?
     def changeEntry(self, table, column, entry, crit="", crit2=""):
@@ -243,6 +232,85 @@ class InCollegeBackend():
                 update_query = update_query + ';'
                 cursor.execute(update_query, (entry, self.userID))
 
+    def getUserName(self, user_id):
+        # Get the name of a user based on their user ID
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD,
+                             host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                fetch_query = """
+                SELECT first_name, last_name
+                FROM users
+                WHERE user_id = %s;
+                """
+                cursor.execute(fetch_query, (user_id,))
+                user = cursor.fetchone()
+
+        if user:
+            first_name, last_name = user
+            return f"{first_name} {last_name}"
+        else:
+            return "Unknown User"
+
+    def getUserCount(self):
+        try:
+            with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+                with connection.cursor() as cursor:
+                    # Get the number of users in the database
+                    cursor.execute("SELECT COUNT(*) FROM users;")
+                    user_count = cursor.fetchone()[0]
+            return user_count
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+    def writeUser(self, userID, password, first, last, has_email, has_sms, has_ad, university, major, tier):
+        now = datetime.datetime.now()
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Insert Data into users table
+                insert_query = """
+                INSERT INTO users (user_id, password, first_name, last_name, has_email, has_sms, has_ad, university, major, tier, created_at, last_login)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """
+                cursor.execute(insert_query, (userID, password, first, last,
+                               has_email, has_sms, has_ad, university, major, tier, now, now))
+
+    def signInHelper(self, userID, password):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                # Fetch user details from the database
+                cursor.execute(
+                    "SELECT * FROM users WHERE user_id = %s AND password = %s", (userID, password))
+                user = cursor.fetchone()
+        return user
+
+    def getUserByCriteria(self, criteria, entry):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                search_query = f"""
+                SELECT user_id, first_name, last_name, university, major 
+                FROM users 
+                WHERE {criteria} = %s AND user_id != %s;
+                """
+                cursor.execute(search_query, (entry, self.userID))
+
+                users = cursor.fetchall()
+        return users
+
+    def getAllUsers(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Construct the query
+                fetch_query = f"""
+                SELECT user_id, first_name, last_name 
+                FROM users; 
+                """
+                cursor.execute(fetch_query)
+                return cursor.fetchall()
+
+    ##########
+    ## JOBS ##
+    ##########
+
     def listJobs(self):
         """
         Retrieve a list of all available jobs.
@@ -252,7 +320,7 @@ class InCollegeBackend():
                 cursor.execute("SELECT * FROM jobs")
                 jobs = cursor.fetchall()
         return jobs
-
+    
     def hasAppliedForJob(self, job_id):
         """
         Check if the user has already applied for a job.
@@ -262,6 +330,21 @@ class InCollegeBackend():
                 cursor.execute(
                     "SELECT * FROM job_applications WHERE user_id = %s AND job_id = %s", (self.userID, job_id))
                 return cursor.fetchone() is not None
+            
+    def jobPostedBySelf(self, job_id):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT user_id FROM jobs WHERE job_id = %s", (job_id,))
+                job_user_id = cursor.fetchone()
+                if job_user_id and job_user_id[0] == self.userID:
+                    return True
+                return False
+    
+    def getJobTitle(self, job_id):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT title FROM jobs WHERE job_id = %s", (job_id,))
+                return cursor.fetchone()[0]
 
     def storeJobApplication(self, job_id, job_title, graduation_date, start_date, paragraph_text):
         """
@@ -374,6 +457,223 @@ class InCollegeBackend():
                 print(f"  Employer: {job['employer']}")
                 print(f"  Location: {job['location']}")
                 print(f"  Salary: {job['salary']}\n")
+
+    def getJobCount(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Get the number of jobs in the database
+                cursor.execute("SELECT COUNT(*) FROM jobs;")
+                jobs_count = cursor.fetchone()[0]
+        return jobs_count
+
+    def writeJob(self, title, description, employer, location, salary, userID, first_name, last_name):
+        now = datetime.datetime.now()
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Insert job details into the jobs table
+                insert_query = """
+                INSERT INTO jobs (title, description, employer, location, salary, user_id, first_name, last_name, date_posted)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """
+                cursor.execute(insert_query, (title, description, employer,
+                               location, salary, userID, first_name, last_name, now))
+
+    def getJobsByUser(self, userID):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                fetch_query = """
+                    SELECT job_id, user_id, title, description, employer, location, salary 
+                    FROM jobs 
+                    WHERE user_id = %s;
+                    """
+                cursor.execute(fetch_query, (userID,))
+                active_jobs = cursor.fetchall()
+        return active_jobs
+
+    def deleteJobFromDatabase(self, id):
+        self.nullApplication(id)
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                delete_query = """
+                        DELETE FROM jobs   
+                        WHERE job_id = %s;
+                        """
+                cursor.execute(delete_query, (id,))
+
+    def nullApplication(self, oldJob_id):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                update_query = """
+                        UPDATE job_applications 
+                        SET job_id = %s
+                        WHERE job_id = %s;
+                        """
+                newJob_id = None
+                cursor.execute(update_query, (newJob_id, oldJob_id))
+
+
+    #############
+    ## FRIENDS ##
+    #############
+    
+    def sendConnectRequest(self, from_user_id, to_user_id):
+        # Connect to the database
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Check if there's already a request or friendship between these two users
+                check_query = """
+                SELECT * FROM friendships 
+                WHERE (student1_id = %s AND student2_id = %s) 
+                OR (student1_id = %s AND student2_id = %s);
+                """
+                cursor.execute(check_query, (from_user_id,
+                               to_user_id, to_user_id, from_user_id))
+                existing_friendship = cursor.fetchone()
+
+                if existing_friendship:
+                    if existing_friendship[3] == 'pending':
+                        print("There's already a pending request.")
+                    else:
+                        print("You're already connected with this user.")
+                    return
+
+                # Insert the connection request into the table
+                insert_query = """
+                INSERT INTO friendships (student1_id, student2_id, status) 
+                VALUES (%s, %s, 'pending');
+                """
+                cursor.execute(insert_query, (from_user_id, to_user_id))
+                connection.commit()
+
+        print(f"Connection request sent to user {to_user_id}!")
+
+    def checkPendingRequests(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                fetch_query = """
+                SELECT student1_id 
+                FROM friendships 
+                WHERE student2_id = %s AND status = 'pending';
+                """
+                cursor.execute(fetch_query, (self.userID,))
+                requests = cursor.fetchall()
+
+        if requests:
+            print(f"\nYou have {len(requests)} pending friend requests!")
+            for request in requests:
+                # request[0] is student1_id, who sent the request
+                self.handleFriendRequest(request[0])
+
+    def handleFriendRequest(self, from_user_id):
+        # Fetch the name of the person who sent the request for better UI
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                name_query = """
+                SELECT first_name, last_name 
+                FROM users 
+                WHERE user_id = %s;
+                """
+                cursor.execute(name_query, (from_user_id,))
+                name = cursor.fetchone()
+
+        print(f"\nFriend request from: {name[0]} {name[1]}")
+
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                while True:
+                    choice = input(
+                        "Do you want to accept this friend request? (yes/no): ").lower()
+                    if choice == 'yes':
+                        # Update the friendship status to confirmed
+                        update_query = """
+                        UPDATE friendships 
+                        SET status = 'confirmed' 
+                        WHERE student1_id = %s AND student2_id = %s;
+                        """
+                        cursor.execute(
+                            update_query, (from_user_id, self.userID))
+                        print("Friend request accepted!")
+                        break
+                    elif choice == 'no':
+                        # Delete the friend request record
+                        delete_query = """
+                        DELETE FROM friendships 
+                        WHERE student1_id = %s AND student2_id = %s;
+                        """
+                        cursor.execute(
+                            delete_query, (from_user_id, self.userID))
+                        print("Friend request rejected!")
+                        break
+                    else:
+                        print("Unrecognized input. Please enter yes or no.")
+
+    def viewPendingRequests(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                fetch_query = """
+                SELECT student1_id, first_name, last_name 
+                FROM friendships JOIN users ON friendships.student1_id = users.user_id
+                WHERE student2_id = %s AND status = 'pending';
+                """
+                cursor.execute(fetch_query, (self.userID,))
+                requests = cursor.fetchall()
+
+        if requests:
+            print("\nPending Friend Requests:")
+            for req in requests:
+                print(f"User ID: {req[0]}, Name: {req[1]} {req[2]}")
+        else:
+            print("\nYou have no pending friend requests.")
+
+    def getFriends(self):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Get friends where the current user is student1
+                fetch_query_1 = """
+                SELECT student2_id, first_name, last_name 
+                FROM friendships JOIN users ON friendships.student2_id = users.user_id
+                WHERE student1_id = %s AND status = 'confirmed';
+                """
+                cursor.execute(fetch_query_1, (self.userID,))
+                friends_1 = cursor.fetchall()
+
+                # Get friends where the current user is student2
+                fetch_query_2 = """
+                SELECT student1_id, first_name, last_name 
+                FROM friendships JOIN users ON friendships.student1_id = users.user_id
+                WHERE student2_id = %s AND status = 'confirmed';
+                """
+                cursor.execute(fetch_query_2, (self.userID,))
+                friends_2 = cursor.fetchall()
+
+        return friends_1 + friends_2
+
+    def deleteConnection(self, friend_id):
+        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
+            with connection.cursor() as cursor:
+                # Check if the given user_id exists in the friend's list
+                check_query = """
+                SELECT * FROM friendships 
+                WHERE (student1_id = %s AND student2_id = %s) OR (student1_id = %s AND student2_id = %s);
+                """
+                cursor.execute(check_query, (self.userID,
+                               friend_id, friend_id, self.userID))
+
+                if cursor.fetchone():  # If exists
+                    # Proceed to delete the friendship
+                    delete_query = """
+                    DELETE FROM friendships 
+                    WHERE (student1_id = %s AND student2_id = %s) OR (student1_id = %s AND student2_id = %s);
+                    """
+                    cursor.execute(delete_query, (self.userID,
+                                   friend_id, friend_id, self.userID))
+                    return True
+                else:
+                    return False
+
+    #############
+    ## PROFILE ##
+    #############
 
     def hasProfile(self, id):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
@@ -490,114 +790,101 @@ class InCollegeBackend():
 
         print(profile)
 
-    def sendConnectRequest(self, from_user_id, to_user_id):
-        # Connect to the database
+    def addEmptyJobExperience(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
-                # Check if there's already a request or friendship between these two users
-                check_query = """
-                SELECT * FROM friendships 
-                WHERE (student1_id = %s AND student2_id = %s) 
-                OR (student1_id = %s AND student2_id = %s);
-                """
-                cursor.execute(check_query, (from_user_id,
-                               to_user_id, to_user_id, from_user_id))
-                existing_friendship = cursor.fetchone()
+                connection._set_autocommit(True)
+                cursor.execute(f"""
+                            INSERT INTO experiences (user_id)
+                            VALUES ('{self.userID}');
+                            """)
+                cursor.execute(f"""
+                                SELECT experience_id
+                                FROM experiences
+                                WHERE user_id = '{self.userID}';
+                                """)
+                return cursor.fetchall()[-1][0]
 
-                if existing_friendship:
-                    if existing_friendship[3] == 'pending':
-                        print("There's already a pending request.")
-                    else:
-                        print("You're already connected with this user.")
-                    return
-
-                # Insert the connection request into the table
-                insert_query = """
-                INSERT INTO friendships (student1_id, student2_id, status) 
-                VALUES (%s, %s, 'pending');
-                """
-                cursor.execute(insert_query, (from_user_id, to_user_id))
-                connection.commit()
-
-        print(f"Connection request sent to user {to_user_id}!")
-
-    def checkPendingRequests(self):
+    def addEmptyEducation(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
-                fetch_query = """
-                SELECT student1_id 
-                FROM friendships 
-                WHERE student2_id = %s AND status = 'pending';
-                """
-                cursor.execute(fetch_query, (self.userID,))
-                requests = cursor.fetchall()
+                cursor.execute(f"""
+                            INSERT INTO educations (user_id)
+                            VALUES ('{self.userID}');
+                            """)
 
-        if requests:
-            print(f"\nYou have {len(requests)} pending friend requests!")
-            for request in requests:
-                # request[0] is student1_id, who sent the request
-                self.handleFriendRequest(request[0])
-
-    def handleFriendRequest(self, from_user_id):
-        # Fetch the name of the person who sent the request for better UI
+    def addEmptyProfile(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
-                name_query = """
-                SELECT first_name, last_name 
-                FROM users 
-                WHERE user_id = %s;
-                """
-                cursor.execute(name_query, (from_user_id,))
-                name = cursor.fetchone()
-
-        print(f"\nFriend request from: {name[0]} {name[1]}")
-
+                cursor.execute(f"""
+                            INSERT INTO profiles (user_id)
+                            VALUES ('{self.userID}');
+                            """)
+                
+    def jobExperienceHelper(self):
+        options = []
+        jobs = []
+        ids = []
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
-                while True:
-                    choice = input(
-                        "Do you want to accept this friend request? (yes/no): ").lower()
-                    if choice == 'yes':
-                        # Update the friendship status to confirmed
-                        update_query = """
-                        UPDATE friendships 
-                        SET status = 'confirmed' 
-                        WHERE student1_id = %s AND student2_id = %s;
-                        """
-                        cursor.execute(
-                            update_query, (from_user_id, self.userID))
-                        print("Friend request accepted!")
-                        break
-                    elif choice == 'no':
-                        # Delete the friend request record
-                        delete_query = """
-                        DELETE FROM friendships 
-                        WHERE student1_id = %s AND student2_id = %s;
-                        """
-                        cursor.execute(
-                            delete_query, (from_user_id, self.userID))
-                        print("Friend request rejected!")
-                        break
-                    else:
-                        print("Unrecognized input. Please enter yes or no.")
+                flag = 0
+                try:
+                    cursor.execute(f"""SELECT *
+                                    FROM experiences
+                                    WHERE user_id = '{self.userID}'""")
+                    vals = cursor.fetchall()
+                    if not vals:
+                        raise Exception
+                except:
+                    options.append("Add Job Experience")
+                    flag = 1
+                if not flag:
+                    vals = list(vals)
 
-    def viewPendingRequests(self):
+                    print("Current job experience:")
+                    for val in vals:
+                        print(f"""
+                            Worked as a {val[2]} for {val[3]} , from {val[4]} to {val[5]}, at {val[6]}.\n
+                            {val[7]}
+                            """)
+                        jobs.append(f"{val[2]} for {val[3]}")
+                        ids.append(val[0])
+                    options.append("Edit Job Experience")
+                    if len(vals) < 3:
+                        options.append("Add Job Experience")
+
+        options.append("Go Back")
+        return options, jobs, ids
+
+    def educationHelper(self):
+        options = []
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
-                fetch_query = """
-                SELECT student1_id, first_name, last_name 
-                FROM friendships JOIN users ON friendships.student1_id = users.user_id
-                WHERE student2_id = %s AND status = 'pending';
-                """
-                cursor.execute(fetch_query, (self.userID,))
-                requests = cursor.fetchall()
+                flag = 0
+                try:
+                    cursor.execute(f"""SELECT *
+                                    FROM educations
+                                    WHERE user_id = '{self.userID}'""")
+                    vals = cursor.fetchall()
+                    if not vals:
+                        raise Exception
+                except:
+                    options.append("Add Education")
+                    flag = 1
+                if not flag:
+                    vals = list(vals[0])
+                    print(f"""
+                          Current education:
+                          Attended {vals[2]} from {vals[4]} to {vals[5]} to obtain a {vals[3]}.
+                          """)
+                    options.append("Edit Education")
 
-        if requests:
-            print("\nPending Friend Requests:")
-            for req in requests:
-                print(f"User ID: {req[0]}, Name: {req[1]} {req[2]}")
-        else:
-            print("\nYou have no pending friend requests.")
+        options.append("Go Back")
+        return options
+
+    ##############
+    ## MESSAGES ##
+    ##############
 
     def addMessageToDatabase(self, from_user_id, to_user_id, message):
         now = datetime.datetime.now()
@@ -639,25 +926,6 @@ class InCollegeBackend():
                 cursor.execute(delete_query, (message_id,))
         print("Message deleted.")
 
-    def getUserName(self, user_id):
-        # Get the name of a user based on their user ID
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD,
-                             host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                fetch_query = """
-                SELECT first_name, last_name
-                FROM users
-                WHERE user_id = %s;
-                """
-                cursor.execute(fetch_query, (user_id,))
-                user = cursor.fetchone()
-
-        if user:
-            first_name, last_name = user
-            return f"{first_name} {last_name}"
-        else:
-            return "Unknown User"
-
     def readMessage(self, message_id):
         # Read a specific message and update its status
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD,
@@ -691,181 +959,6 @@ class InCollegeBackend():
         else:
             print("Message not found in your inbox.")
 
-    def getJobCount(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Get the number of jobs in the database
-                cursor.execute("SELECT COUNT(*) FROM jobs;")
-                jobs_count = cursor.fetchone()[0]
-        return jobs_count
-
-    def writeJob(self, title, description, employer, location, salary, userID, first_name, last_name):
-        now = datetime.datetime.now()
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Insert job details into the jobs table
-                insert_query = """
-                INSERT INTO jobs (title, description, employer, location, salary, user_id, first_name, last_name, date_posted)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """
-                cursor.execute(insert_query, (title, description, employer,
-                               location, salary, userID, first_name, last_name, now))
-
-    def getJobsByUser(self, userID):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                fetch_query = """
-                    SELECT job_id, user_id, title, description, employer, location, salary 
-                    FROM jobs 
-                    WHERE user_id = %s;
-                    """
-                cursor.execute(fetch_query, (userID,))
-                active_jobs = cursor.fetchall()
-        return active_jobs
-
-    def deleteJobFromDatabase(self, id):
-        self.nullApplication(id)
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                delete_query = """
-                        DELETE FROM jobs   
-                        WHERE job_id = %s;
-                        """
-                cursor.execute(delete_query, (id,))
-    
-    def nullApplication(self, oldJob_id):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                update_query = """
-                        UPDATE job_applications 
-                        SET job_id = %s
-                        WHERE job_id = %s;
-                        """
-                newJob_id = None
-                cursor.execute(update_query, (newJob_id, oldJob_id))
-
-    def getUserCount(self):
-        try:
-            with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-                with connection.cursor() as cursor:
-                    # Get the number of users in the database
-                    cursor.execute("SELECT COUNT(*) FROM users;")
-                    user_count = cursor.fetchone()[0]
-            return user_count
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
-    def writeUser(self, userID, password, first, last, has_email, has_sms, has_ad, university, major, tier):
-        now = datetime.datetime.now()
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Insert Data into users table
-                insert_query = """
-                INSERT INTO users (user_id, password, first_name, last_name, has_email, has_sms, has_ad, university, major, tier, created_at, last_login)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """
-                cursor.execute(insert_query, (userID, password, first, last,
-                               has_email, has_sms, has_ad, university, major, tier, now, now))
-
-    def signInHelper(self, userID, password):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor(row_factory=dict_row) as cursor:
-                # Fetch user details from the database
-                cursor.execute(
-                    "SELECT * FROM users WHERE user_id = %s AND password = %s", (userID, password))
-                user = cursor.fetchone()
-        return user
-
-    def getUserByCriteria(self, criteria, entry):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                search_query = f"""
-                SELECT user_id, first_name, last_name, university, major 
-                FROM users 
-                WHERE {criteria} = %s AND user_id != %s;
-                """
-                cursor.execute(search_query, (entry, self.userID))
-
-                users = cursor.fetchall()
-        return users
-
-    def addEmptyJobExperience(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                connection._set_autocommit(True)
-                cursor.execute(f"""
-                            INSERT INTO experiences (user_id)
-                            VALUES ('{self.userID}');
-                            """)
-                cursor.execute(f"""
-                                SELECT experience_id
-                                FROM experiences
-                                WHERE user_id = '{self.userID}';
-                                """)
-                return cursor.fetchall()[-1][0]
-
-    def addEmptyEducation(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                            INSERT INTO educations (user_id)
-                            VALUES ('{self.userID}');
-                            """)
-
-    def addEmptyProfile(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                            INSERT INTO profiles (user_id)
-                            VALUES ('{self.userID}');
-                            """)
-
-    def getFriends(self):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Get friends where the current user is student1
-                fetch_query_1 = """
-                SELECT student2_id, first_name, last_name 
-                FROM friendships JOIN users ON friendships.student2_id = users.user_id
-                WHERE student1_id = %s AND status = 'confirmed';
-                """
-                cursor.execute(fetch_query_1, (self.userID,))
-                friends_1 = cursor.fetchall()
-
-                # Get friends where the current user is student2
-                fetch_query_2 = """
-                SELECT student1_id, first_name, last_name 
-                FROM friendships JOIN users ON friendships.student1_id = users.user_id
-                WHERE student2_id = %s AND status = 'confirmed';
-                """
-                cursor.execute(fetch_query_2, (self.userID,))
-                friends_2 = cursor.fetchall()
-
-        return friends_1 + friends_2
-
-    def deleteConnection(self, friend_id):
-        with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
-            with connection.cursor() as cursor:
-                # Check if the given user_id exists in the friend's list
-                check_query = """
-                SELECT * FROM friendships 
-                WHERE (student1_id = %s AND student2_id = %s) OR (student1_id = %s AND student2_id = %s);
-                """
-                cursor.execute(check_query, (self.userID,
-                               friend_id, friend_id, self.userID))
-
-                if cursor.fetchone():  # If exists
-                    # Proceed to delete the friendship
-                    delete_query = """
-                    DELETE FROM friendships 
-                    WHERE (student1_id = %s AND student2_id = %s) OR (student1_id = %s AND student2_id = %s);
-                    """
-                    cursor.execute(delete_query, (self.userID,
-                                   friend_id, friend_id, self.userID))
-                    return True
-                else:
-                    return False
-
     def getMessages(self):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
@@ -879,7 +972,7 @@ class InCollegeBackend():
                 cursor.execute(fetch_query, (self.userID,))
                 messages = cursor.fetchall()
         return messages
-
+    
     ###################
     ## NOTIFICATIONS ##
     ###################
