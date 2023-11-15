@@ -1,7 +1,5 @@
-import psycopg
-import re
+import psycopg, re, datetime
 from psycopg.rows import dict_row
-from datetime import datetime, timedelta
 
 DATABASE_QUERY_STRING = """
                         CREATE TABLE users (
@@ -753,15 +751,16 @@ class InCollegeBackend():
             print(f"An error occurred: {e}")
 
     def writeUser(self, userID, password, first, last, has_email, has_sms, has_ad, university, major, tier):
+        now = datetime.datetime.now()
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
             with connection.cursor() as cursor:
                 # Insert Data into users table
                 insert_query = """
-                INSERT INTO users (user_id, password, first_name, last_name, has_email, has_sms, has_ad, university, major, tier)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                INSERT INTO users (user_id, password, first_name, last_name, has_email, has_sms, has_ad, university, major, tier, created_at, last_login)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                 """
                 cursor.execute(insert_query, (userID, password, first, last,
-                               has_email, has_sms, has_ad, university, major, tier))
+                               has_email, has_sms, has_ad, university, major, tier, now, now))
 
     def signInHelper(self, userID, password):
         with psycopg.connect(dbname=self.DATABASE_NAME, user=self.DATABASE_USER, password=self.DATABASE_PASSWORD, host=self.DATABASE_HOST, port=self.DATABASE_PORT) as connection:
@@ -910,7 +909,7 @@ class InCollegeBackend():
 
                     if last_application_date:
                         # Calculate the difference between the current date and the last application date
-                        difference = datetime.now() - last_application_date
+                        difference = datetime.datetime.now() - last_application_date
 
                         # If the difference is greater than 7 days, generate the notification
                         if difference.days > 7:
@@ -1041,6 +1040,7 @@ class InCollegeBackend():
     ######################
 
     def update_last_login(self, user_id):
+        now = datetime.datetime.now()
         try:
             with psycopg.connect(
                     dbname=self.DATABASE_NAME,
@@ -1051,10 +1051,10 @@ class InCollegeBackend():
                 with connection.cursor() as cursor:
                     update_query = """
                     UPDATE users
-                    SET last_login = CURRENT_TIMESTAMP
+                    SET last_login = %s
                     WHERE user_id = %s;
                     """
-                    cursor.execute(update_query, (user_id,))
+                    cursor.execute(update_query, (now, user_id))
                     connection.commit()
         except psycopg.Error as e:
             print(f"Error updating last login: {e}")

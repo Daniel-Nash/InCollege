@@ -31,15 +31,13 @@ defaultEmailPref = True
 defaultSMSPref = True
 defaultAdsPref = True
 defaultLanguage = "English"
-defaultUniversity = "University of South Florida"
-defaultMajor = "Computer Science"
-defaultUniversity = defaultUniversity.title()
-defaultMajor = defaultMajor.title()
+defaultUniversity = "University of South Florida".title()
+defaultMajor = "Computer Science".title()
 defaultTier = "Standard"
-defaultProfileTitle = "Title"
-defaultProfileAbout = "About"
-defaultUserTuple = (defaultUser, defaultPassword, defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier)
-defaultUserTupleString = f"('{defaultUser}', '{defaultPassword}', '{defaultFirstName}', '{defaultLastName}', {defaultEmailPref}, {defaultSMSPref}, {defaultAdsPref}, '{defaultLanguage}', '{defaultUniversity}', '{defaultMajor}', '{defaultTier}')"
+defaultFakeTime = datetime.datetime.now()
+defaultCreationTime = defaultFakeTime
+defaultLastLogin = defaultFakeTime
+defaultUserTuple = (defaultUser, defaultPassword, defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)
 defaultUserTable = [[defaultUserTuple]]
 maxUsers = 10
 
@@ -53,6 +51,9 @@ defaultSalary = "0"
 defaultJobTuple = (1, defaultUser, defaultTitle, defaultDescription, defaultEmployer, defaultLocation, defaultSalary, defaultFirstName, defaultLastName)
 defaultJobTable = [[defaultJobTuple]]
 maxJobs = 10
+
+defaultProfileTitle = "Title"
+defaultProfileAbout = "About"
 
 defaultGraduationYear = 2030
 defaultGraduationMonth = 3
@@ -78,6 +79,15 @@ DATABASE_USER = "postgres"
 DATABASE_PASSWORD = "postgres"
 DATABASE_HOST = "localhost" 
 DATABASE_PORT = "5432"
+
+@pytest.fixture
+def freezeTime(monkeypatch):
+    class freeze(datetime.datetime):
+        @classmethod
+        def now(cls):
+            return defaultFakeTime
+
+    monkeypatch.setattr(datetime, 'datetime', freeze)
 
 def dropTestDatabase():
     try:
@@ -114,24 +124,19 @@ def clear():
 # don't use this function unless you need an existing user! start the function with clear() instead
 def addTestUser(num = 1):
   clear()
-  finalTuple = [[]]
+  finalTuple = [[defaultUserTuple]]
+  rows = [list(defaultUserTuple)]
 
-  with psycopg.connect(dbname=DATABASE_TEST_NAME, user=DATABASE_USER, password=DATABASE_PASSWORD, host=DATABASE_HOST, port=DATABASE_PORT) as connection:
-      with connection.cursor() as cursor:
-          try:
-              cursor.execute(f"""INSERT INTO USERS VALUES {defaultUserTupleString}""")
-              finalTuple[0].append(defaultUserTuple)
-          except Exception as e:
-              print(f"Error executing query: {e}")
-          if num > 1:
-              rows = []
-              for i in range(1, num):
-                userTuple = list(defaultUserTuple)
-                userTuple[0] = f"{defaultUser}{str(i)}"
-                rows.append(userTuple)
-                finalTuple[0].append(tuple(userTuple))
-              addRowsToTable(rows, 'users')
-      return finalTuple
+  if num > 1:
+      
+      for i in range(1, num):
+        userTuple = list(defaultUserTuple)
+        userTuple[0] = f"{defaultUser}{str(i)}"
+        rows.append(userTuple)
+        finalTuple[0].append(tuple(userTuple))
+
+  addRowsToTable(rows, 'users')
+  return finalTuple
   
 def readDB(select = "all"):
     read = []
@@ -292,7 +297,7 @@ def test_mainScreenSearchInvalidUser(monkeypatch, capsys):
     assert f"No user found with Last Name: {testName}." in capsys.readouterr().out
 
 # tests new user creation with valid username/password
-def test_newUser(monkeypatch, capsys):
+def test_newUser(monkeypatch, capsys, freezeTime):
   clear()
 
   testUsernamesPasswords = [["pyTestUser", "pyTest123%"],
@@ -311,12 +316,13 @@ def test_newUser(monkeypatch, capsys):
     monkeypatch.setattr('builtins.input', lambda _: next(inputs))
 
     InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+    
     assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier))
+    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin))
     assert readDB("users") == users
 
 # tests new user creation with invalid password due to character requirements
-def test_newUserInvalidCharacter(monkeypatch, capsys):
+def test_newUserInvalidCharacter(monkeypatch, capsys, freezeTime):
   clear()
 
   testPasswords = [
@@ -338,7 +344,7 @@ def test_newUserInvalidCharacter(monkeypatch, capsys):
     clear()
 
 # test new user creation with invalid password due to length requirements
-def test_newUserInvalidLength(monkeypatch, capsys):
+def test_newUserInvalidLength(monkeypatch, capsys, freezeTime):
   clear()
 
   testPasswords = ["pyTes7!", "pyTest13!!!!!", "pyTestVeryLongPassword!"]
@@ -362,7 +368,7 @@ def test_newUserInvalidLength(monkeypatch, capsys):
     clear()
 
 # tests new user creation with existing username
-def test_newUserInvalidExisting(monkeypatch, capsys):
+def test_newUserInvalidExisting(monkeypatch, capsys, freezeTime):
   addTestUser()
 
   secondUser = list(defaultUserTuple)
@@ -380,7 +386,7 @@ def test_newUserInvalidExisting(monkeypatch, capsys):
   assert readDB("users") == [[defaultUserTuple, tuple(secondUser)]]
 
 # tests new user creation with maximum number of users
-def test_newUserExceedsLimit(monkeypatch, capsys):
+def test_newUserExceedsLimit(monkeypatch, capsys, freezeTime):
   comparison = addTestUser(maxUsers)
 
   # create the 6th account
@@ -399,7 +405,7 @@ def test_newUserExceedsLimit(monkeypatch, capsys):
   assert comparison == readDB("users")
 
 # tests existing user login with valid username/password
-def test_loginExistingUser(monkeypatch, capsys):
+def test_loginExistingUser(monkeypatch, capsys, freezeTime):
   clear()
 
   testUsernamesPasswords = [["pyTestUser", "pytest123%"],
@@ -410,7 +416,7 @@ def test_loginExistingUser(monkeypatch, capsys):
   users = [[]]
 
   for testUsernamePassword in testUsernamesPasswords:
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier))
+    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin))
 
   addRowsToTable(users[0], 'users')
 
