@@ -48,7 +48,8 @@ defaultDescription = "testsPython"
 defaultEmployer = "pyTest"
 defaultLocation = "pyTest"
 defaultSalary = "0"
-defaultJobTuple = (1, defaultUser, defaultTitle, defaultDescription, defaultEmployer, defaultLocation, defaultSalary, defaultFirstName, defaultLastName)
+defaultDatePosted = defaultFakeTime
+defaultJobTuple = (1, defaultUser, defaultTitle, defaultDescription, defaultEmployer, defaultLocation, defaultSalary, defaultFirstName, defaultLastName, defaultDatePosted)
 defaultJobTable = [[defaultJobTuple]]
 maxJobs = 10
 
@@ -66,6 +67,7 @@ defaultStartDay = 1
 defaultStartDate = f"{defaultStartYear}-{defaultStartMonth}-{defaultStartDay}"
 defaultStartDatetime = datetime.date(defaultStartYear, defaultStartMonth, defaultStartDay)
 defaultApplicationDescription = "compellingExplanation"
+defaultApplicationTuple = (1, defaultUser, 1, defaultTitle, defaultGraduationDatetime, defaultStartDatetime, defaultApplicationDescription, defaultFakeTime)
 
 defaultMessage = "pyTestMessage"
 defaultConcatenatedMessage = defaultMessage[:19]
@@ -406,31 +408,17 @@ def test_newUserExceedsLimit(monkeypatch, capsys, freezeTime):
 
 # tests existing user login with valid username/password
 def test_loginExistingUser(monkeypatch, capsys, freezeTime):
-  clear()
+  users = addTestUser()
 
-  testUsernamesPasswords = [["pyTestUser", "pytest123%"],
-                            ["pyTestUser2", "PYTEST123"],
-                            ["thisIsALongTestStringPyTestUser3", "aBcd&&&&"],
-                            ["4", "999ZZZZ"], ["b", "kop0`-2fwe"]]
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
 
-  users = [[]]
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
 
-  for testUsernamePassword in testUsernamesPasswords:
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin))
-
-  addRowsToTable(users[0], 'users')
-
-  for testUsernamePassword in testUsernamesPasswords:
-
-    prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
-    monkeypatch.setattr(promptModule, lambda _: next(prompts))
-
-    inputs = iter([testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName])
-    monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-
-    InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
-    assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    assert users == readDB("users")
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+  assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
+  assert users == readDB("users")
 
 # tests login attempt with invalid username.
 def test_loginInvalidUsername(monkeypatch, capsys):
@@ -470,23 +458,8 @@ def test_loginInvalidPassword(monkeypatch, capsys):
     captured_output = capsys.readouterr().out
     assert "\nIncorrect username / password, please try again\n" in captured_output
 
-
-# tests the search job feature
-def test_searchJob(monkeypatch, capsys):
-  addTestUser()
-
-  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
-  monkeypatch.setattr(promptModule, lambda _: next(prompts))
-
-  inputs = iter([defaultUser, defaultPassword])
-  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-
-  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
-
-  assert "under construction." in capsys.readouterr().out
-
 # tests the post job feature
-def test_postJob(monkeypatch, capsys):
+def test_postJob(monkeypatch, capsys, freezeTime):
   addTestUser()
 
   prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Post a Job'}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -499,15 +472,15 @@ def test_postJob(monkeypatch, capsys):
 
   assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
   read = readDB("jobs")[0][0]
-  assert read[1:5] == defaultJobTable[0][0][1:5] and read[7:8] == defaultJobTable[0][0][7:8]
+  assert read[1:5] == defaultJobTable[0][0][1:5] and read[7:9] == defaultJobTable[0][0][7:9]
 
 # tests the post job feature when the next job would exceed the post limit
-def test_postJobExceedsLimit(monkeypatch, capsys):
+def test_postJobExceedsLimit(monkeypatch, capsys, freezeTime):
   addTestUser()
 
   jobs = [[]]
   for i in range(maxJobs):
-     jobs[0].append((i+1, defaultUser, defaultTitle, defaultDescription, defaultEmployer, defaultLocation, defaultSalary, defaultFirstName, defaultLastName))
+     jobs[0].append((i+1, defaultUser, defaultTitle, defaultDescription, defaultEmployer, defaultLocation, defaultSalary, defaultFirstName, defaultLastName, defaultDatePosted))
   
   addRowsToTable(jobs[0], 'jobs')
 
@@ -521,7 +494,7 @@ def test_postJobExceedsLimit(monkeypatch, capsys):
 
   assert "You have reached the maximum number of job postings." in capsys.readouterr().out
   read = readDB("jobs")[0][0]
-  assert read[1:5] == defaultJobTable[0][0][1:5] and read[7:8] == defaultJobTable[0][0][7:8]
+  assert read[1:5] == defaultJobTable[0][0][1:5] and read[7:9] == defaultJobTable[0][0][7:9]
 
 # tests the search skill feature
 def test_searchSkill(monkeypatch, capsys):
@@ -542,36 +515,22 @@ def test_searchSkill(monkeypatch, capsys):
     assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
 
 # tests whether the sign in feature works from the useful links menu
-def test_usefulLinksSignIn(monkeypatch, capsys):
-  clear()
+def test_usefulLinksSignIn(monkeypatch, capsys, freezeTime):
+  users = addTestUser()
 
-  testUsernamesPasswords = [["pyTestUser", "pytest123%"],
-                            ["pyTestUser2", "PYTEST123"],
-                            ["thisIsALongTestStringPyTestUser3", "aBcd&&&&"],
-                            ["4", "999ZZZZ"], ["b", "kop0`-2fwe"]]
+  prompts = iter([{0: 'Useful Links'}, {0: 'General'}, {0: 'Sign Up'}, {0: 'Sign In'}, {0: 'Log out'}, {0: 'Back to General'}, {0: 'Back to Useful Links'}, {0: 'Back to Main Menu'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
 
-  users = [[]]
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
 
-  for testUsernamePassword in testUsernamesPasswords:
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier))
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
-  addRowsToTable(users[0], 'users')
-
-  for testUsernamePassword in testUsernamesPasswords:
-
-    prompts = iter([{0: 'Useful Links'}, {0: 'General'}, {0: 'Sign Up'}, {0: 'Sign In'}, {0: 'Log out'}, {0: 'Back to General'}, {0: 'Back to Useful Links'}, {0: 'Back to Main Menu'}, {0: 'Exit'}])
-    monkeypatch.setattr(promptModule, lambda _: next(prompts))
-
-    inputs = iter([testUsernamePassword[0], testUsernamePassword[1]])
-    monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-
-    InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
-
-    assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    assert readDB("users") == users
+  assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
+  assert readDB("users") == users
   
 # tests whether the sign up feature works from the useful links menu
-def test_usefulLinksSignUp(monkeypatch, capsys):
+def test_usefulLinksSignUp(monkeypatch, capsys, freezeTime):
   clear()
 
   testUsernamesPasswords = [["pyTestUser", "pyTest123%"],
@@ -591,7 +550,7 @@ def test_usefulLinksSignUp(monkeypatch, capsys):
 
     InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
     assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier)) 
+    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)) 
     assert readDB("users") == users
 
 def test_helpCenter(monkeypatch, capsys):
@@ -1090,7 +1049,7 @@ def test_searchJobEmpty(monkeypatch, capsys):
 
   assert "No active job postings found." in capsys.readouterr().out
 
-def test_saveJob(monkeypatch, capsys):
+def test_saveJob(monkeypatch, capsys, freezeTime):
   addTestUser()
   jobs = [defaultJobTuple]
   addRowsToTable(jobs, 'jobs')
@@ -1104,13 +1063,13 @@ def test_saveJob(monkeypatch, capsys):
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
   assert "Job successfully saved" in capsys.readouterr().out
-  assert readDB('saved_jobs')[0][0] == (defaultUser, 1)
+  assert readDB('saved_jobs')[0][0] == (defaultUser, 1, defaultFakeTime)
 
 def test_unsaveJob(monkeypatch, capsys):
   addTestUser()
   jobs = [defaultJobTuple]
   addRowsToTable(jobs, 'jobs')
-  saved_jobs = [(defaultUser, 1)]
+  saved_jobs = [(defaultUser, 1, defaultFakeTime)]
   addRowsToTable(saved_jobs, 'saved_jobs')
 
   prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: f"Job ID: 1, Title: {defaultTitle}"}, {0: 'Save/Unsave the Job'}, {0: 'Go Back'}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1124,7 +1083,7 @@ def test_unsaveJob(monkeypatch, capsys):
   assert "Job successfully unsaved" in capsys.readouterr().out
   assert readDB('saved_jobs') == [[]]
 
-def test_applyToJob(monkeypatch, capsys):
+def test_applyToJob(monkeypatch, capsys, freezeTime):
   addTestUser(2)
   jobPost = list(defaultJobTuple)
   jobPost[1] = defaultUser+'1'
@@ -1143,13 +1102,13 @@ def test_applyToJob(monkeypatch, capsys):
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
   assert "Application submitted successfully!" in capsys.readouterr().out
-  assert readDB('job_applications')[0][0] == (1, defaultUser, 1, defaultGraduationDatetime, defaultStartDatetime, defaultApplicationDescription)
+  assert readDB('job_applications')[0][0] == defaultApplicationTuple
 
 def test_applyToAppliedJob(monkeypatch, capsys):
   addTestUser()
   jobs = [defaultJobTuple]
   addRowsToTable(jobs, 'jobs')
-  applications = [(1, defaultUser, 1, defaultGraduationDatetime, defaultStartDatetime, defaultApplicationDescription)]
+  applications = [defaultApplicationTuple]
   addRowsToTable(applications, 'job_applications')
 
   prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: f"Job ID: 1, Title: {defaultTitle} (Applied to)"}, {0: 'Apply for the Job'}, {0: 'Go Back'}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1265,7 +1224,7 @@ def test_listSavedJobs(monkeypatch, capsys):
 
 ## Sprint 7 Tests ##
 
-def test_sendMessage(monkeypatch, capsys):
+def test_sendMessage(monkeypatch, capsys, freezeTime):
   addTestUser(2)
   friendships = [[1, defaultUser, defaultUser+"1", "confirmed"]]
   addRowsToTable(friendships, "friendships")
@@ -1279,9 +1238,9 @@ def test_sendMessage(monkeypatch, capsys):
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
   assert f"Message sent to user {defaultUser+'1'}!" in capsys.readouterr().out
-  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread")]
+  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread", defaultFakeTime)]
 
-def test_sendMessageThroughNetwork(monkeypatch, capsys):
+def test_sendMessageThroughNetwork(monkeypatch, capsys, freezeTime):
   clear()
   firstUser = list(defaultUserTuple)
   secondUser = list(defaultUserTuple)
@@ -1301,9 +1260,9 @@ def test_sendMessageThroughNetwork(monkeypatch, capsys):
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
   assert f"Message sent to user {defaultUser+'1'}!" in capsys.readouterr().out
-  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread")]
+  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread", defaultFakeTime)]
 
-def test_sendMessagePlus(monkeypatch, capsys):
+def test_sendMessagePlus(monkeypatch, capsys, freezeTime):
   clear()
   firstUser = list(defaultUserTuple)
   secondUser = list(defaultUserTuple)
@@ -1321,11 +1280,11 @@ def test_sendMessagePlus(monkeypatch, capsys):
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
   assert f"Message sent to user {defaultUser+'1'}!" in capsys.readouterr().out
-  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread")]
+  assert readDB("messages")[0] == [(1, defaultUser, defaultUser + '1', defaultMessage, "unread", defaultFakeTime)]
 
 def test_messageNotificationOnLogin(monkeypatch, capsys):
   addTestUser(2)
-  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread"]]
+  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread", defaultFakeTime]]
   addRowsToTable(messages, "messages")
 
   prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1336,11 +1295,11 @@ def test_messageNotificationOnLogin(monkeypatch, capsys):
 
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
-  assert f"You have 1 pending messages in your inbox!" in capsys.readouterr().out
+  assert f"You have messages waiting for you in your inbox." in capsys.readouterr().out
 
 def test_readMessage(monkeypatch, capsys):
   addTestUser(2)
-  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread"]]
+  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread", defaultFakeTime]]
   addRowsToTable(messages, "messages")
 
   prompts = iter([{0: 'Sign In'}, {0: 'Messages'}, {0: 'Inbox'}, {0: f'(UNREAD) {defaultFirstName} {defaultLastName}: {defaultMessage}'}, {0: 'Go Back'}, {0: 'Go Back'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1356,7 +1315,7 @@ def test_readMessage(monkeypatch, capsys):
 
 def test_deleteMessage(monkeypatch, capsys):
   addTestUser(2)
-  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread"]]
+  messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread", defaultFakeTime]]
   addRowsToTable(messages, "messages")
 
   prompts = iter([{0: 'Sign In'}, {0: 'Messages'}, {0: 'Inbox'}, {0: f'(UNREAD) {defaultFirstName} {defaultLastName}: {defaultMessage}'}, {0: 'Delete Message'}, {0: 'Go Back'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1370,9 +1329,9 @@ def test_deleteMessage(monkeypatch, capsys):
   assert "Message deleted." in capsys.readouterr().out
   assert readDB('messages') == [[]]
 
-def test_respondToMessage(monkeypatch, capsys):
+def test_respondToMessage(monkeypatch, capsys, freezeTime):
     addTestUser(2)
-    messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread"]]
+    messages = [[1, defaultUser+'1', defaultUser, defaultMessage, "unread", defaultFakeTime]]
     addRowsToTable(messages, "messages")
 
     prompts = iter([{0: 'Sign In'}, {0: 'Messages'}, {0: 'Inbox'}, {0: f'(UNREAD) {defaultFirstName} {defaultLastName}: {defaultConcatenatedMessage}'}, {0: 'Respond to Message'}, {0: 'Go Back'}, {0: 'Go Back'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
@@ -1384,13 +1343,13 @@ def test_respondToMessage(monkeypatch, capsys):
     InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
     assert "Response message sent." in capsys.readouterr().out
-    assert readDB('messages') == [[(1, defaultUser+'1', defaultUser, defaultMessage, "read"), (2, defaultUser, defaultUser+'1', defaultMessage, "unread")]]
+    assert readDB('messages') == [[(1, defaultUser+'1', defaultUser, defaultMessage, "read", defaultFakeTime), (2, defaultUser, defaultUser+'1', defaultMessage, "unread", defaultFakeTime)]]
 
 ###
 def test_notifyProfileNotCreated(monkeypatch, capsys):
   addTestUser()
   
-  prompts = iter([{0: 'Sign In'}, {0: 'Profile'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
   monkeypatch.setattr(promptModule, lambda _: next(prompts))
 
   inputs = iter([defaultUser, defaultPassword])
@@ -1398,12 +1357,17 @@ def test_notifyProfileNotCreated(monkeypatch, capsys):
 
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
-  assert f"You have not created a profile yet. Create a profile to enhance your InCollege experience!" in capsys.readouterr().out
+  assert f"Don't forget to create a profile" in capsys.readouterr().out
 
 def test_notifyNewJobPosted(monkeypatch, capsys):
   addTestUser(2)
-  
-  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: 'Go Back'}, {0:'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
+  jobs = list(defaultJobTuple)
+  jobs[1] = defaultUser + '1'
+  jobs[-1] += datetime.timedelta(0, 3)
+  jobs = [jobs]
+  addRowsToTable(jobs, 'jobs')
+
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
   monkeypatch.setattr(promptModule, lambda _: next(prompts))
 
   inputs = iter([defaultUser, defaultPassword])
@@ -1411,7 +1375,7 @@ def test_notifyNewJobPosted(monkeypatch, capsys):
 
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
-  assert f"New job posted: {defaultTitle}" in capsys.readouterr().out
+  assert f"A new job {defaultTitle} has been posted by {defaultUser}" in capsys.readouterr().out
 
 def test_notifyJobDeleted(monkeypatch, capsys):
   addTestUser()
@@ -1426,9 +1390,102 @@ def test_notifyJobDeleted(monkeypatch, capsys):
 
   InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
 
-  assert f"Job deleted: {defaultTitle}" in capsys.readouterr().out
+  assert f"A job that you applied for has been deleted: {defaultTitle}" in capsys.readouterr().out
 
+def test_notifyApplyForJobNoApplications(monkeypatch, capsys):
+  addTestUser()
 
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert "Remember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!" in capsys.readouterr().out
+
+def test_notifyApplyForJobSevenDays(monkeypatch, capsys):
+  addTestUser(2)
+
+  jobs = list(defaultJobTuple)
+  jobs[1] = defaultUser + '1'
+  jobs = [jobs]
+  addRowsToTable(jobs, 'jobs')
+
+  applications = list(defaultApplicationTuple)
+  applications[-1] -= datetime.timedelta(7)
+  applications = [applications]
+  addRowsToTable(applications, 'job_applications')
+
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert "Remember – you're going to want to have a job when you graduate. Make sure that you start to apply for jobs today!" in capsys.readouterr().out
+
+def test_notifyAppliedForNumJobs(monkeypatch, capsys):
+  addTestUser(2)
+
+  for i in (0, 1):
+    if i == 1:
+        jobs = list(defaultJobTuple)
+        jobs[1] = defaultUser + '1'
+        jobs = [jobs]
+        addRowsToTable(jobs, 'jobs')
+        applications = [defaultApplicationTuple]
+        addRowsToTable(applications, 'job_applications')
+      
+    prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
+    monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+    inputs = iter([defaultUser, defaultPassword])
+    monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+    InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+    assert f"You have currently applied for {i} job(s)" in capsys.readouterr().out
+
+def test_notifyAppliedJobDeleted(monkeypatch, capsys):
+  addTestUser(2)
+
+  applications = list(defaultApplicationTuple)
+  applications[2] = None
+  applications = [applications]
+  addRowsToTable(applications, 'job_applications')
+
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert f"A job that you applied for has been deleted: {defaultTitle}" in capsys.readouterr().out
+
+def test_notifyNewStudent(monkeypatch, capsys):
+  clear()
+
+  userTwo = list(defaultUserTuple)
+  userTwo[0] += '1'
+  userTwo[-2] += datetime.timedelta(0, 1)
+
+  addRowsToTable([defaultUserTuple, userTwo], 'users')
+
+  prompts = iter([{0: 'Sign In'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert f"{defaultFirstName} {defaultLastName} has joined InCollege" in capsys.readouterr().out
 
 def test_dummy():
   dropTestDatabase()
