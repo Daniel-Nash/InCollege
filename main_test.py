@@ -1386,6 +1386,50 @@ def test_respondToMessage(monkeypatch, capsys):
     assert "Response message sent." in capsys.readouterr().out
     assert readDB('messages') == [[(1, defaultUser+'1', defaultUser, defaultMessage, "read"), (2, defaultUser, defaultUser+'1', defaultMessage, "unread")]]
 
+###
+def test_notifyProfileNotCreated(monkeypatch, capsys):
+  addTestUser()
+  
+  prompts = iter([{0: 'Sign In'}, {0: 'Profile'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert f"You have not created a profile yet. Create a profile to enhance your InCollege experience!" in capsys.readouterr().out
+
+def test_notifyNewJobPosted(monkeypatch, capsys):
+  addTestUser(2)
+  
+  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: 'Go Back'}, {0:'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert f"New job posted: {defaultTitle}" in capsys.readouterr().out
+
+def test_notifyJobDeleted(monkeypatch, capsys):
+  addTestUser()
+  jobs = [defaultJobTuple]
+  addRowsToTable(jobs, 'jobs')
+
+  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Delete a Job'}, {0: f"Job ID: 1, User ID: {defaultUser}, Title: {defaultTitle}, Description: {defaultDescription}, Employer: {defaultEmployer}, Location: {defaultLocation}, Salary: {defaultSalary}"}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
+  monkeypatch.setattr(promptModule, lambda _: next(prompts))
+
+  inputs = iter([defaultUser, defaultPassword])
+  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
+
+  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
+
+  assert f"Job deleted: {defaultTitle}" in capsys.readouterr().out
+
+
+
 def test_dummy():
   dropTestDatabase()
 
