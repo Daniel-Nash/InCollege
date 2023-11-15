@@ -1397,7 +1397,7 @@ def test_notifyProfileNotCreated(monkeypatch, capsys):
 def test_notifyNewJobPosted(monkeypatch, capsys):
   addTestUser(2)
   
-  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: 'Go Back'}, {0: 'Log out'}, {0: 'Exit'}])
+  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Search for a Job'}, {0: 'Go Back'}, {0:'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
   monkeypatch.setattr(promptModule, lambda _: next(prompts))
 
   inputs = iter([defaultUser, defaultPassword])
