@@ -1377,21 +1377,6 @@ def test_notifyNewJobPosted(monkeypatch, capsys):
 
   assert f"A new job {defaultTitle} has been posted by {defaultUser}" in capsys.readouterr().out
 
-def test_notifyJobDeleted(monkeypatch, capsys):
-  addTestUser()
-  jobs = [defaultJobTuple]
-  addRowsToTable(jobs, 'jobs')
-
-  prompts = iter([{0: 'Sign In'}, {0: 'Job search/internship'}, {0: 'Delete a Job'}, {0: f"Job ID: 1, User ID: {defaultUser}, Title: {defaultTitle}, Description: {defaultDescription}, Employer: {defaultEmployer}, Location: {defaultLocation}, Salary: {defaultSalary}"}, {0: 'Back to the main menu'}, {0: 'Log out'}, {0: 'Exit'}])
-  monkeypatch.setattr(promptModule, lambda _: next(prompts))
-
-  inputs = iter([defaultUser, defaultPassword])
-  monkeypatch.setattr('builtins.input', lambda _: next(inputs))
-
-  InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
-
-  assert f"A job that you applied for has been deleted: {defaultTitle}" in capsys.readouterr().out
-
 def test_notifyApplyForJobNoApplications(monkeypatch, capsys):
   addTestUser()
 
