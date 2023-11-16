@@ -4,7 +4,7 @@ from psycopg.rows import dict_row
 DATABASE_QUERY_STRING = """
                         CREATE TABLE users (
                             user_id VARCHAR(255) PRIMARY KEY,
-                            password TEXT NOT NULL,
+                            password BIGINT NOT NULL,
                             first_name VARCHAR(255) NOT NULL,
                             last_name VARCHAR(255) NOT NULL,
                             has_email BOOLEAN DEFAULT TRUE,

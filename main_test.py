@@ -32,7 +32,7 @@ defaultTier = "Standard"
 defaultFakeTime = datetime.datetime.now()
 defaultCreationTime = defaultFakeTime
 defaultLastLogin = defaultFakeTime
-defaultUserTuple = (defaultUser, defaultPassword, defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)
+defaultUserTuple = (defaultUser, hash(defaultPassword), defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)
 defaultUserTable = [[defaultUserTuple]]
 maxUsers = 10
 
@@ -313,7 +313,7 @@ def test_newUser(monkeypatch, capsys, freezeTime):
     InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
     
     assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin))
+    users[0].append((testUsernamePassword[0], hash(testUsernamePassword[1]), defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin))
     assert readDB("users") == users
 
 # tests new user creation with invalid password due to character requirements
@@ -543,7 +543,7 @@ def test_usefulLinksSignUp(monkeypatch, capsys, freezeTime):
 
     InCollegeServer(DATABASE_TEST_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT)
     assert capsys.readouterr().out.split('\n')[-3] == "Thank you, bye!"
-    users[0].append((testUsernamePassword[0], testUsernamePassword[1], defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)) 
+    users[0].append((testUsernamePassword[0], hash(testUsernamePassword[1]), defaultFirstName, defaultLastName, defaultEmailPref, defaultSMSPref, defaultAdsPref, defaultLanguage, defaultUniversity, defaultMajor, defaultTier, defaultCreationTime, defaultLastLogin)) 
     assert readDB("users") == users
 
 def test_helpCenter(monkeypatch, capsys):
