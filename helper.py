@@ -1,10 +1,10 @@
-import psycopg, re, datetime
+import psycopg, re, datetime, hashlib
 from psycopg.rows import dict_row
 
 DATABASE_QUERY_STRING = """
                         CREATE TABLE users (
                             user_id VARCHAR(255) PRIMARY KEY,
-                            password BIGINT NOT NULL,
+                            password TEXT NOT NULL,
                             first_name VARCHAR(255) NOT NULL,
                             last_name VARCHAR(255) NOT NULL,
                             has_email BOOLEAN DEFAULT TRUE,
@@ -139,6 +139,9 @@ def getDate():
         print('Invalid input. Please input a valid day.')
 
     return f"{year}-{month}-{day}"
+
+def sha256_hash(input_string):
+    return hashlib.sha256(input_string.encode()).hexdigest()
 
 class InCollegeBackend():
 

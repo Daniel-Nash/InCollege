@@ -160,7 +160,7 @@ class InCollegeServer(InCollegeBackend):
         """
         while True:
             existingUserID = input("Please enter UserID: ")
-            existingPassword = hash(input("Please enter password: "))
+            existingPassword = helper.sha256_hash(input("Please enter password: "))
 
             user = self.signInHelper(existingUserID, existingPassword)
 
@@ -203,7 +203,7 @@ class InCollegeServer(InCollegeBackend):
             print("===============================\n1) Password must be 8 - 12 characters\n2) Must contain at least one capital letter\n3) Must contain a number\n4) Must contain a special character\n =================================")
             password = input("Please enter password: ")
             if self.validPassword(password):
-                password = hash(password)
+                password = helper.sha256_hash(password)
                 break
             print("This password doesn't meet all the requirements.")
         first = input("Please enter your first name: ")
